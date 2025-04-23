@@ -3,7 +3,6 @@ import tensorflow as tf
 import numpy as np
 import mediapipe as mp
 import cv2
-import pyttsx3
 import os
 import tempfile
 from gtts import gTTS
