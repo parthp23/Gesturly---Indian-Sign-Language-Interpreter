@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Favicon for browser tab -->
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='smallLogoNoBG.png') }}">
+  <title>Sign Language Detection</title>
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
+  
+  <!-- Styles for layout and responsiveness -->
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body, h1, h2, h3, h4, h5, h6, button, input, select, textarea, label, span, div {
+      font-family: 'Poppins', sans-serif !important;
+      font-weight: 400 !important;
+    }
+    body {
+      background-color: #1a1a1a;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #00bcd4;
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 2em;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    .main-content {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 20px;
+      max-width: 1200px;
+      width: 100%;
+      flex-wrap: nowrap;
+    }
+    .video-container, .reference-container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+    }
+    #processedImage, #referenceCollage {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+      margin-bottom: 20px;
+      border: 3px solid #f58962;
+    }
+    .reference-hidden { display: none; }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 28px;
+      margin-right: 10px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #333;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #f58962;
+    }
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+    .toggle-label {
+      font-size: 0.95em;
+      color: #f58962;
+    }
+
+    .text-container {
+      background-color: #2d2d2d;
+      border-radius: 12px;
+      padding: 15px;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 20px;
+    }
+    .letter-display {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 1.1em;
+    }
+    .current-letter {
+      background-color: #333;
+      padding: 6px 12px;
+      border-radius: 8px;
+      color: #ff9800;
+      font-size: 1.3em;
+      min-width: 36px;
+      margin-left: 8px;
+    }
+    .input-label {
+      font-size: 1.1em;
+      margin-bottom: 8px;
+      display: block;
+    }
+    #constructedSentenceBox {
+      width: 100%;
+      padding: 10px;
+      font-size: 1em;
+      border-radius: 8px;
+      border: 2px solid #4caf50;
+      background-color: #333;
+      color: #fff;
+      resize: none;
+      min-height: 50px;
+    }
+    #constructedSentenceBox:focus {
+      outline: none;
+      border-color: #8bc34a;
+    }
+
+    #suggestions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      width: 100%;
+      max-width: 640px;
+    }
+    .suggestion {
+      background: linear-gradient(145deg, #2196f3, #03a9f4);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 0.95em;
+      cursor: pointer;
+      min-width: 120px;
+    }
+    .suggestion[disabled] {
+      background: rgba(255, 255, 255, 0.05);
+      color: #aaa;
+      border: 1px solid #444;
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      width: 100%;
+      max-width: 640px;
+    }
+    .control-button {
+      background-color: #009688;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.95em;
+      cursor: pointer;
+      flex: 1;
+      max-width: 180px;
+    }
+    #speakBtn.speaking {
+      background-color: #ff9800 !important;
+      animation: pulse-speak 1s infinite;
+    }
+    @keyframes pulse-speak {
+      0% { opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
+
+    .detection-status {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: #4caf50;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.75em;
+      display: flex;
+      align-items: center;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    }
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      background-color: #4caf50;
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: blink-dot 1s infinite;
+    }
+    @keyframes blink-dot {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+
+    @media (max-width: 900px) {
+      .main-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      h1 { font-size: 1.5em; }
+      .current-letter { font-size: 1.2em; }
+      .control-button, .suggestion {
+        font-size: 0.85em;
+        padding: 8px 12px;
+        max-width: 100%;
+      }
+      .toggle-container {
+        flex-direction: column;
+        gap: 4px;
+      }
+    }
+
+    .logo-fixed {
+      width: 140px;
+      height: auto;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <img src="{{ url_for('static', filename='GesturlyLogoNoBG.png') }}" alt="Gesturly Logo" class="logo-fixed">
+  <audio id="audioPlayer"></audio>
+
+  <div class="toggle-container">
+    <label class="toggle-switch">
+      <input type="checkbox" id="referenceToggle" checked>
+      <span class="slider"></span>
+    </label>
+    <span class="toggle-label">Show Reference Guide</span>
+  </div>
+
+  <div class="main-content">
+    <div class="video-container">
+      <img id="processedImage" src="" alt="Hand Detection Feed">
+      <div class="detection-status">
+        <div class="status-indicator"></div>
+        <span>Detecting</span>
+      </div>
+    </div>
+
+    <div id="referenceContainer" class="reference-container">
+      <img id="referenceCollage" src="{{ url_for('static', filename='allGestures.png') }}" alt="Sign Language Reference">
+    </div>
+  </div>
+
+  <div class="text-container">
+    <div class="letter-display">
+      <span>Currently Detecting:</span>
+      <div class="current-letter" id="lastLetter"></div>
+    </div>
+    <label class="input-label" for="constructedSentenceBox">Your Sentence:</label>
+    <textarea id="constructedSentenceBox" placeholder="Your detected text will appear here..." rows="2"></textarea>
+  </div>
+
+  <div id="suggestions">
+    <button class="suggestion" onclick="chooseSuggestion(0)"></button>
+    <button class="suggestion" onclick="chooseSuggestion(1)"></button>
+    <button class="suggestion" onclick="chooseSuggestion(2)"></button>
+  </div>
+
+  <div class="controls">
+    <button id="clearBtn" class="control-button" onclick="clearText()">Clear All</button>
+    <button id="undoBtn" class="control-button" onclick="undoLast()">Undo</button>
+    <button id="speakBtn" class="control-button" onclick="speakText()">Speak Text</button>
+  </div>
+
+  <script>
+    const processedImage = document.querySelector("#processedImage");
+    const constructedSentenceBox = document.querySelector("#constructedSentenceBox");
+    const lastLetterSpan = document.querySelector("#lastLetter");
+    const suggestionButtons = document.querySelectorAll(".suggestion");
+    const referenceToggle = document.getElementById("referenceToggle");
+    const referenceContainer = document.getElementById("referenceContainer");
+
+    referenceToggle.addEventListener('change', () => {
+      referenceContainer.classList.toggle('reference-hidden', !referenceToggle.checked);
+    });
+
+    const video = document.createElement('video');
+    video.setAttribute('autoplay', '');
+    video.style.display = 'none';
+    document.body.appendChild(video);
+
+    let currentSentence = "";
+    let manualEdit = false;
+
+    if (navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => { video.srcObject = stream; })
+        .catch(err => {
+          console.error("Camera access error:", err);
+          alert("Unable to access camera.");
+        });
+    }
+
+    video.addEventListener('loadeddata', function () {
+      function predictFrame() {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        const image = canvas.toDataURL('image/jpeg');
+
+        fetch('/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.image) processedImage.src = "data:image/jpeg;base64," + data.image;
+          if (!manualEdit) constructedSentenceBox.value = data.predicted_text || "";
+          lastLetterSpan.innerText = data.last_letter || "";
+          suggestionButtons.forEach((btn, i) => {
+            btn.innerText = data.suggestions?.[i] || "";
+            btn.disabled = !data.suggestions?.[i];
+          });
+          setTimeout(predictFrame, 100);
+        })
+        .catch(err => {
+          console.error(err);
+          setTimeout(predictFrame, 100);
+        });
+      }
+
+      predictFrame();
+    });
+
+    function chooseSuggestion(i) {
+      const word = suggestionButtons[i].innerText;
+      if (!word) return;
+      let parts = constructedSentenceBox.value.trim().split(" ");
+      parts.pop();
+      constructedSentenceBox.value = [...parts, word].join(" ") + " ";
+      updateServerText(constructedSentenceBox.value);
+    }
+
+    function updateServerText(text) {
+      fetch('/update-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      }).catch(err => console.error("Update error:", err));
+    }
+
+    constructedSentenceBox.addEventListener("focus", () => manualEdit = true);
+    constructedSentenceBox.addEventListener("blur", () => {
+      manualEdit = false;
+      updateServerText(constructedSentenceBox.value);
+    });
+    constructedSentenceBox.addEventListener("keyup", () => {
+      updateServerText(constructedSentenceBox.value);
+    });
+
+    function clearText() {
+      fetch('/clear', { method: 'POST' })
+        .then(res => res.ok && (constructedSentenceBox.value = "", lastLetterSpan.innerText = ""))
+        .catch(err => console.error("Clear error:", err));
+    }
+
+    function undoLast() {
+      fetch('/undo', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          constructedSentenceBox.value = data.predicted_text || "";
+          lastLetterSpan.innerText = data.last_letter || "";
+        }).catch(err => console.error("Undo error:", err));
+    }
+
+    const audioPlayer = document.getElementById("audioPlayer");
+
+    function speakText() {
+      const text = constructedSentenceBox.value.trim();
+      if (!text) return;
+      const btn = document.getElementById("speakBtn");
+      btn.classList.add("speaking");
+      btn.disabled = true;
+      btn.textContent = "Processing...";
+
+      fetch('/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "success") {
+          btn.textContent = "Playing...";
+          audioPlayer.src = "data:audio/mp3;base64," + data.audio;
+          audioPlayer.onended = () => {
+            btn.classList.remove("speaking");
+            btn.textContent = "Speak Text";
+            btn.disabled = false;
+          };
+          audioPlayer.play();
+        } else {
+          throw new Error(data.message);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Failed to convert text to speech.");
+        btn.classList.remove("speaking");
+        btn.textContent = "Speak Text";
+        btn.disabled = false;
+      });
+    }
+
+    audioPlayer.addEventListener('ended', () => {
+      const btn = document.getElementById("speakBtn");
+      btn.classList.remove("speaking");
+      btn.textContent = "Speak Text";
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>
