@@ -6,4 +6,4 @@ opencv-python==4.11.0.86
 numpy==1.26.4
 pandas==2.2.2
 gTTS==2.5.4
-gunicorn-23.0.0
+gunicorn==23.0.0
